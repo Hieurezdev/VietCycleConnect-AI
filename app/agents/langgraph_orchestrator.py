@@ -20,8 +20,8 @@ settings = get_settings()
 llm = ChatGoogleGenerativeAI(
     model=settings.general_gemini_model,
     google_api_key=settings.gemini_api_key,
-    temperature=0.1,
-    convert_system_message_to_human=True,  # Sometimes needed for Gemini
+    temperature=0.2,
+    convert_system_message_to_human=True,
 )
 
 # Tools
@@ -34,7 +34,7 @@ def agent_node(state: AgentState):
     """
     messages = state["messages"]
 
-    # Use the new prompt from app/agents/prompt.py
+    # Use the prompt from app/agents/prompt.py
     system_prompt = root_agent_instruction
 
     # We can bind tools to the LLM
@@ -78,7 +78,7 @@ def rag_agent_node(state: AgentState):
 
         # 2. Vector Search to find relevant Order nodes
         # Assuming index name "order_embeddings" exists on Order nodes
-        results = neo4j.vector_search("order_embeddings", query_embedding, top_k=10)
+        results = neo4j.vector_search("order_embedding_index", query_embedding, top_k=10)
 
         if not results:
             context_data = "No relevant orders found."

@@ -16,9 +16,9 @@
 
 ## Tổng Quan | Overview
 
-**VietCycleConnect AI** là một hệ thống trợ lý AI với tên gọi Anna, Anna được thiết kế để kết nối người mua và người bán phế liệu tại Việt Nam. Hệ thống sử dụng công nghệ Graph Database (Neo4j), Vector Search, và Large Language Models (LLMs) để cung cấp giải pháp tìm kiếm và ghép đôi thông minh.
+**VietCycleConnect AI** là một hệ thống trợ lý AI với tên gọi Tina, Tina được thiết kế để kết nối người mua và người bán phế liệu tại Việt Nam. Hệ thống sử dụng công nghệ Graph Database (Neo4j), Vector Search, và Large Language Models (LLMs) để cung cấp giải pháp tìm kiếm và ghép đôi thông minh.
 
-**VietCycleConnect AI** is an intelligent assistant system named Anna, Anna designed to connect scrap buyers and sellers in Vietnam. The system leverages Graph Database (Neo4j), Vector Search, and Large Language Models (LLMs) to provide smart search and matching solutions.
+**VietCycleConnect AI** is an intelligent assistant system named Tina, Tina designed to connect scrap buyers and sellers in Vietnam. The system leverages Graph Database (Neo4j), Vector Search, and Large Language Models (LLMs) to provide smart search and matching solutions.
 
 ---
 

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """Service for generating embeddings using Google Gemini.
 
-    Uses gemini-embedding-001 model for consistent 2048-dimensional embeddings.
+    Uses gemini-embedding-001 model for consistent 3072-dimensional embeddings.
     """
 
     def __init__(self) -> None:
@@ -40,7 +40,7 @@ class EmbeddingService:
                 - "CLUSTERING": For text clustering
 
         Returns:
-            List[float]: Embedding vector (2048 dimensions).
+            List[float]: Embedding vector (3072 dimensions).
 
         Raises:
             Exception: If embedding generation fails.
@@ -77,7 +77,7 @@ class EmbeddingService:
             task_type: Task type for embedding (see embed_text for options).
 
         Returns:
-            List[float]: Embedding vector (2048 dimensions).
+            List[float]: Embedding vector (3072 dimensions).
 
         Raises:
             Exception: If embedding generation fails.
@@ -240,9 +240,9 @@ class EmbeddingService:
         """Get the dimension of embeddings produced by this model.
 
         Returns:
-            int: Embedding dimension (2048 for gemini-embedding-001).
+            int: Embedding dimension (3072 for gemini-embedding-001).
         """
-        return 2048
+        return 3072
 
 
 # Global embedding service instance

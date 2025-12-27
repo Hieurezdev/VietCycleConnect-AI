@@ -11,7 +11,7 @@ class EmbeddingVector(BaseModel):
     """Value object representing an embedding vector."""
 
     values: list[float]
-    dimension: int = 2048  # gemini-embedding-001
+    dimension: int = 3072  # gemini-embedding-001
     model: str = "gemini-embedding-001"
 
     def model_post_init(self, __context: object) -> None:
