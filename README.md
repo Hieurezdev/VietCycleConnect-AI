@@ -26,7 +26,7 @@
 
 ### Smart Matching
 - **Vector Search trên Neo4j**: Tìm kiếm đơn hàng phế liệu phù hợp nhất dựa trên độ tương đồng ngữ nghĩa (semantic similarity)
-- **Embeddings 2048 chiều**: Sử dụng Google Gemini Embeddings cho độ chính xác cao
+- **Embeddings**: Sử dụng Google Gemini Embeddings cho độ chính xác cao
 
 ### Graph RAG (Retrieval-Augmented Generation)
 - Kết hợp thông tin từ graph relationships để cung cấp câu trả lời có ngữ cảnh
@@ -83,14 +83,14 @@
 
 #### 2. **Neo4j Vector Store**
 - Lưu trữ embeddings của đơn hàng phế liệu
-- Vector index: `order_embeddings` (2048 dimensions)
+- Vector index: `order_embeddings` (3072 dimensions)
 - Graph relationships: Company, ScrapType, Location
 
 #### 3. **Google Gemini Integration**
 - **LLM Models**:
   - `gemini-2.5-pro`: General conversation
   - `gemini-3-pro-preview`: Complex reasoning
-- **Embeddings**: `gemini-embedding-001` (2048D)
+- **Embeddings**: `gemini-embedding-001`
 
 ---
 
@@ -139,7 +139,7 @@
    FOR (o:Order)
    ON o.embedding
    OPTIONS {indexConfig: {
-     `vector.dimensions`: 2048,
+     `vector.dimensions`: 3072,
      `vector.similarity_function`: 'cosine'
    }};
    ```
@@ -232,10 +232,150 @@ make format         # Format code
 | **LLM** | Google Gemini (2.5-pro, 3-pro-preview) |
 | **Agent Framework** | LangGraph |
 | **Database** | Neo4j 5.0+ (Graph + Vector) |
-| **Embeddings** | Gemini Embedding (2048D) |
+| **Embeddings** | Gemini Embedding (3072D) |
 | **Package Manager** | UV |
 | **Testing** | Pytest |
 | **Code Quality** | Ruff, MyPy |
+
+---
+
+## Công Nghệ & Kỹ Thuật | Technologies & Techniques
+
+### 1. Core Technologies
+
+#### Backend Framework
+- **FastAPI**: Modern, high-performance web framework
+  - Async/await support
+  - Automatic API documentation (Swagger/ReDoc)
+  - Pydantic data validation
+  - Dependency injection system
+
+#### Programming Language
+- **Python 3.12+**: Latest Python features
+  - Type hints for better code quality
+  - Async programming capabilities
+  - Modern syntax improvements
+
+### 2. AI & Machine Learning
+
+#### Large Language Models (LLMs)
+- **Google Gemini 2.5-Pro**: General-purpose conversations
+  - Context window: 1M tokens
+  - Multimodal capabilities
+- **Gemini 3-Pro-Preview**: Complex reasoning tasks
+  - Advanced problem-solving
+  - Chain-of-thought reasoning
+
+#### Embeddings
+- **gemini-embedding-001**: Vector embeddings
+  - Dimension: 3072
+  - Semantic similarity analysis
+  - Multilingual support (Vietnamese optimized)
+
+#### Agent Framework
+- **LangGraph**: Stateful agent orchestration
+  - Graph-based workflow management
+  - Tool calling and integration
+  - State persistence and recovery
+  - Conditional routing logic
+
+### 3. Database & Storage
+
+#### Graph Database
+- **Neo4j 5.0+**: High-performance graph database
+  - Native graph storage
+  - Cypher query language
+  - ACID transactions
+  - Horizontal scalability
+
+#### Vector Search
+- **Neo4j Vector Index**:
+  - Cosine similarity search
+  - 3072-dimensional vectors
+  - Hybrid graph + vector queries
+  - Real-time indexing
+
+### 4. Architecture Patterns
+
+#### Hexagonal Architecture (Ports & Adapters)
+```
+Core Domain
+    ├── Entities (User, Conversation, Message)
+    ├── Value Objects (ChatContext, AgentResponse)
+    └── Ports (Service Interfaces)
+
+Infrastructure
+    ├── Adapters (Implementations)
+    ├── Database Clients (Neo4j)
+    └── External APIs (Gemini)
+```
+
+#### RAG (Retrieval-Augmented Generation)
+- Vector similarity search
+- Graph traversal for context enrichment
+- Dynamic context construction
+- Prompt engineering
+
+### 5. Development Tools
+
+#### Package Management
+- **UV**: Ultra-fast Python package installer
+  - 10-100x faster than pip
+  - Lock file for reproducibility
+  - Virtual environment management
+
+#### Code Quality
+- **Ruff**: Extremely fast Python linter
+  - Replaces Flake8, isort, pyupgrade
+  - Auto-fixes common issues
+- **MyPy**: Static type checker
+  - Type safety enforcement
+- **Pre-commit**: Git hooks for code quality
+  - Automatic formatting
+  - Linting before commit
+
+#### Testing
+- **Pytest**: Modern testing framework
+  - Async test support
+  - Fixtures and parametrization
+  - Coverage reporting
+
+### 6. API & Integration
+
+#### RESTful API
+- **Endpoints**:
+  - `POST /api/v1/chat/`: Chat interaction
+  - `GET /health/`: Health check
+  - `GET /docs`: Swagger UI
+  - `GET /redoc`: ReDoc documentation
+
+#### External Services
+- **Google Custom Search API**: Web search capability
+- **SerpAPI**: Alternative search provider
+- **Neo4j Aura**: Cloud database option
+
+### 7. Advanced Techniques
+
+#### Semantic Search
+- **Vector Embeddings**: Convert text to dense vectors
+- **Cosine Similarity**: Measure semantic distance
+- **Top-K Retrieval**: Get most relevant results
+
+#### Graph Traversal
+- **Relationship-based Queries**: Navigate Company → Order → ScrapType
+- **Path Finding**: Discover connections
+- **Aggregations**: Analytics on graph data
+
+#### Prompt Engineering
+- **System Instructions**: Role definition for AI
+- **Few-shot Learning**: Examples in prompts
+- **Chain-of-Thought**: Step-by-step reasoning
+- **Tool Use**: Function calling for external data
+
+#### Async Programming
+- **Asyncio**: Concurrent request handling
+- **Async/Await**: Non-blocking I/O
+- **Connection Pooling**: Efficient resource usage
 
 ---
 
