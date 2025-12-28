@@ -410,7 +410,7 @@ flowchart TD
     G -->|No| H[Log error, use fallback]
     G -->|Yes| I[Vector Search]
     I --> J{Results Found?}
-    J -->|No| K[Generate "no results" response]
+    J -->|No| K[Generate no results response]
     J -->|Yes| L[Generate with context]
     L --> M{LLM Success?}
     M -->|No| N[500 Internal Error]
