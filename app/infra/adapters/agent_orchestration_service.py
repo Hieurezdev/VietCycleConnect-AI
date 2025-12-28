@@ -45,8 +45,6 @@ class AgentOrchestrationService(IAgentOrchestrationService):
                 elif msg.role == "assistant":
                     history_messages.append(AIMessage(content=msg.content))
 
-                # Skip system messages in history if managed by config/prompt
-
             # Initial State
             initial_state = {
                 "messages": history_messages + [HumanMessage(content=message)],
@@ -64,7 +62,15 @@ class AgentOrchestrationService(IAgentOrchestrationService):
             # Extract final response from messages
             if "messages" in result and result["messages"]:
                 last_message = result["messages"][-1]
-                content = last_message.content
+
+                # Get content - handle both attribute and property access
+                try:
+                    content = last_message.content
+                except AttributeError as e:
+                    logger.warning(f"Message has no 'content' attribute: {e}")
+                    content = (
+                        last_message.get("content", "") if isinstance(last_message, dict) else ""
+                    )
 
                 # Handle different content formats
                 if isinstance(content, str):
@@ -80,8 +86,16 @@ class AgentOrchestrationService(IAgentOrchestrationService):
                             break
                 else:
                     response_content = str(content)
+                    logger.info(f"Converted to string, length: {len(response_content)}")
+            else:
+                logger.warning("No messages found in LangGraph result")
+                logger.info(f"Result structure: {result}")
 
             processing_time_ms = int((time.time() - start_time) * 1000)
+
+            # Log if we're about to use fallback error message
+            if not response_content:
+                logger.warning("EMPTY RESPONSE_CONTENT DETECTED! Will use fallback error message.")
 
             agent_response = AgentResponse(
                 content=response_content or "Xin lỗi, tôi không thể xử lý yêu cầu này.",
@@ -120,6 +134,5 @@ class AgentOrchestrationService(IAgentOrchestrationService):
             The graph application instance (LangGraph doesn't expose individual agents).
         """
         logger.info(f"get_agent_by_name called with: {agent_name}")
-        # In this LangGraph implementation, we return the graph app itself
-        # since agents are internal nodes, not exposed individually
+
         return self._graph_app

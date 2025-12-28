@@ -1,6 +1,7 @@
 import os
 from functools import lru_cache
 
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -16,15 +17,24 @@ class Settings(BaseSettings):
     general_gemini_model: str = "gemini-2.5-pro"
     embedding_model: str = "gemini-embedding-001"
 
-    # Default gemini model for agents
+    @property
+    def llm(self) -> ChatGoogleGenerativeAI:
+        if not hasattr(self, "_llm"):
+            self._llm = ChatGoogleGenerativeAI(
+                model=self.general_gemini_model,
+                google_api_key=self.gemini_api_key,
+                temperature=0.2,
+                convert_system_message_to_human=True,
+                max_tokens=4096,
+            )
+        return self._llm
+
     @property
     def gemini_model(self) -> str:
-        """Default Gemini model for agents (uses general model)."""
         return self.general_gemini_model
 
     @property
     def rag_model(self) -> str:
-        """RAG model (uses general model for speed)."""
         return self.general_gemini_model
 
     # --- Neo4j Settings ---
@@ -36,10 +46,6 @@ class Settings(BaseSettings):
     google_search_api_key: str | None = os.getenv("GOOGLE_API_KEY")
     google_cse_id: str | None = os.getenv("GOOGLE_CSE_ID")
     serpapi_api_key: str | None = os.getenv("SERPAPI_API_KEY")
-
-    # Memory System
-    # stm_consolidation_threshold: int = 15  # Number of STM before auto-consolidation
-    # stm_max_threshold: int = 20  # Maximum STM before forced consolidation
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
