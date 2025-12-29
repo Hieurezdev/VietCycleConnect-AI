@@ -36,14 +36,23 @@ def agent_node(state: AgentState):
     return {"messages": [response]}
 
 
-def should_continue(state: AgentState) -> Literal["google_search", "rag_agent", "end"]:
+def should_continue(
+    state: AgentState,
+) -> Literal[
+    "google_search",
+    "rag_scraptype_agent",
+    "rag_address_agent",
+    "rag_company_agent",
+    "rag_order_agent",
+    "end",
+]:
     """
     Determine the next step based on the agent's response.
 
     Priority:
     1. If LLM called a tool -> execute that tool
-    2. If response is a final answer -> end
-    3. Never loop back to agent after getting a response
+    2. If response contains a RAG marker -> route to appropriate RAG agent
+    3. If response is a final answer -> end
     """
     messages = state["messages"]
     last_message = messages[-1]
@@ -70,21 +79,312 @@ def should_continue(state: AgentState) -> Literal["google_search", "rag_agent", 
                     break
 
         logger.info(f"Extracted text: {repr(actual_text)[:200]}")
-        logger.info(
-            f"Starts with [RAG_REQUIRED]: {actual_text.strip().startswith('[RAG_REQUIRED]')}"
-        )
 
-        if actual_text.strip().startswith("[RAG_REQUIRED]"):
-            logger.info("Decision: Routing to rag_agent (RAG marker detected)")
-            return "rag_agent"
+        # Check for specific RAG markers
+        if actual_text.strip().startswith("[RAG_SCRAPTYPE]"):
+            logger.info("Decision: Routing to rag_scraptype_agent (ScrapType search)")
+            return "rag_scraptype_agent"
+        elif actual_text.strip().startswith("[RAG_ADDRESS]"):
+            logger.info("Decision: Routing to rag_address_agent (Address search)")
+            return "rag_address_agent"
+        elif actual_text.strip().startswith("[RAG_COMPANY]"):
+            logger.info("Decision: Routing to rag_company_agent (Company search)")
+            return "rag_company_agent"
+        elif actual_text.strip().startswith("[RAG_ORDER]"):
+            logger.info("Decision: Routing to rag_order_agent (Order search)")
+            return "rag_order_agent"
 
     logger.info("Decision: Routing to END (default)")
     return "end"
 
 
-def rag_agent_node(state: AgentState):
+def rag_scraptype_agent_node(state: AgentState):
     """
-    Node to query the Neo4j Graph Database for Scrap Orders using Vector Search.
+    Node to query scrap type from the Neo4j Graph Database for Scrap Orders using Vector Search.
+    """
+    messages = state["messages"]
+    last_user_message = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
+    user_query = last_user_message.content if last_user_message else ""
+
+    neo4j = get_neo4j_manager()
+    embedding_service = get_embedding_service()
+
+    context_lines = []
+    try:
+        query_embedding = embedding_service.embed_query(user_query)
+
+        results = neo4j.vector_search("scraptype_embedding_index", query_embedding, top_k=5)
+
+        if not results:
+            context_data = "No relevant scrap types found."
+        else:
+            for res in results:
+                node = res.get("node", {})
+                score = res.get("score", 0.0)
+
+                scrap_type_id = node.get("id")  # App-level ID
+                logging.info(f"Scrap Type ID: {scrap_type_id}")
+                if scrap_type_id:
+                    neighbor_query = """
+                     MATCH (t:ScrapType {id: $scrap_type_id})
+                     OPTIONAL MATCH (o:Order)-[:HAS_TYPE]->(t)
+                     OPTIONAL MATCH (o)-[:POSTED_BY]->(c:Company)
+                     OPTIONAL MATCH (o)-[:PICKUP_AT]->(a:Address)
+                     RETURN c.name as company, t.name as type, a.full_address as address,
+                            c.description as company_desc, a.type as address_type,
+                            c.phone as phone, c.tax_code as tax_code,
+                            c.email as email, c.verification_status as verification_status,
+                            a.description as address_desc,
+                            o.quantity as quantity, t.unit as unit, t.is_raw as is_raw,
+                            o.price as price, o.vehicle_req as vehicle_req,
+                            o.description as order_desc
+                     """
+                    neighbors = neo4j.execute_query(
+                        neighbor_query, {"scrap_type_id": scrap_type_id}
+                    )
+                    neighbor_info = neighbors[0] if neighbors else {}
+
+                    company_name = neighbor_info.get("company", "Unknown")
+                    scrap_type = neighbor_info.get("type", "Unknown")
+                    address = neighbor_info.get("address", "Unknown")
+                    unit = neighbor_info.get("unit", "Unknown")
+                    phone = neighbor_info.get("phone", "Unknown")
+                    tax_code = neighbor_info.get("tax_code", "Unknown")
+                    address_description = neighbor_info.get("address_desc", "Unknown")
+                    is_raw = neighbor_info.get("is_raw", "Unknown")
+                    email = neighbor_info.get("email", "Unknown")
+                    verification_status = neighbor_info.get("verification_status", "Unknown")
+                    company_desc = neighbor_info.get("company_desc", "Unknown")
+                    address_type = neighbor_info.get("address_type", "Unknown")
+                    order_description = neighbor_info.get("order_desc", "Unknown")
+                    vehicle_req = neighbor_info.get("vehicle_req", "Unknown")
+                    order_qty = neighbor_info.get("quantity")
+                    order_price = neighbor_info.get("price")
+
+                    context_lines.append(
+                        f"Company: {company_name} | "
+                        f"Type: {scrap_type} | "
+                        f"Qty: {order_qty} | "
+                        f"Price: {order_price} | "
+                        f"Address: {address} | "
+                        f"Phone: {phone} | "
+                        f"Tax Code: {tax_code} | "
+                        f"Unit: {unit} | "
+                        f"Order Description: {order_description} | "
+                        f"Address Description: {address_description} | "
+                        f"Vehicle Required: {vehicle_req} | "
+                        f"Is Raw: {is_raw} | "
+                        f"Email: {email} | "
+                        f"Verification Status: {verification_status} | "
+                        f"Company Description: {company_desc} | "
+                        f"Address Type: {address_type} | "
+                        f"(Score: {score:.2f})"
+                    )
+                else:
+                    context_lines.append(f"Order: {node} (Score: {score:.2f})")
+
+            context_data = "\n".join(context_lines)
+
+    except Exception as e:
+        logger.error(f"RAG Vector Search failed: {e}", exc_info=True)
+        context_data = f"Error performing search: {e}"
+
+    logger.info(f"RAG Agent Context built: {len(context_data)} chars")
+    logger.debug(f"Context preview: {context_data[:200]}")
+    return {"context": context_data}
+
+
+def rag_address_agent_node(state: AgentState):
+    """
+    Node to query address from the Neo4j Graph Database for Scrap Orders using Vector Search.
+    """
+    messages = state["messages"]
+    last_user_message = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
+    user_query = last_user_message.content if last_user_message else ""
+
+    neo4j = get_neo4j_manager()
+    embedding_service = get_embedding_service()
+
+    context_lines = []
+    try:
+        query_embedding = embedding_service.embed_query(user_query)
+
+        results = neo4j.vector_search("address_embedding_index", query_embedding, top_k=5)
+
+        if not results:
+            context_data = "No relevant addresses found."
+        else:
+            for res in results:
+                node = res.get("node", {})
+                score = res.get("score", 0.0)
+
+                address_id = node.get("id")  # App-level ID
+                logging.info(f"Address ID: {address_id}")
+                if address_id:
+                    neighbor_query = """
+                     MATCH (a:Address {id: $address_id})
+                     OPTIONAL MATCH (o:Order)-[:PICKUP_AT]->(a)
+                     OPTIONAL MATCH (o)-[:POSTED_BY]->(c:Company)
+                     OPTIONAL MATCH (o)-[:HAS_TYPE]->(t:ScrapType)
+                     RETURN c.name as company, t.name as type, a.full_address as address,
+                            c.description as company_desc, a.type as address_type,
+                            c.phone as phone, c.tax_code as tax_code,
+                            c.email as email, c.verification_status as verification_status,
+                            a.description as address_desc,
+                            o.quantity as quantity, t.unit as unit, t.is_raw as is_raw,
+                            o.price as price, o.vehicle_req as vehicle_req,
+                            o.description as order_desc
+                     """
+                    neighbors = neo4j.execute_query(neighbor_query, {"address_id": address_id})
+                    neighbor_info = neighbors[0] if neighbors else {}
+
+                    company_name = neighbor_info.get("company", "Unknown")
+                    scrap_type = neighbor_info.get("type", "Unknown")
+                    address = neighbor_info.get("address", "Unknown")
+                    unit = neighbor_info.get("unit", "Unknown")
+                    phone = neighbor_info.get("phone", "Unknown")
+                    tax_code = neighbor_info.get("tax_code", "Unknown")
+                    address_description = neighbor_info.get("address_desc", "Unknown")
+                    is_raw = neighbor_info.get("is_raw", "Unknown")
+                    email = neighbor_info.get("email", "Unknown")
+                    verification_status = neighbor_info.get("verification_status", "Unknown")
+                    company_desc = neighbor_info.get("company_desc", "Unknown")
+                    address_type = neighbor_info.get("address_type", "Unknown")
+                    order_description = neighbor_info.get("order_desc", "Unknown")
+                    vehicle_req = neighbor_info.get("vehicle_req", "Unknown")
+                    order_qty = neighbor_info.get("quantity")
+                    order_price = neighbor_info.get("price")
+
+                    context_lines.append(
+                        f"Company: {company_name} | "
+                        f"Type: {scrap_type} | "
+                        f"Qty: {order_qty} | "
+                        f"Price: {order_price} | "
+                        f"Address: {address} | "
+                        f"Phone: {phone} | "
+                        f"Tax Code: {tax_code} | "
+                        f"Unit: {unit} | "
+                        f"Order Description: {order_description} | "
+                        f"Address Description: {address_description} | "
+                        f"Vehicle Required: {vehicle_req} | "
+                        f"Is Raw: {is_raw} | "
+                        f"Email: {email} | "
+                        f"Verification Status: {verification_status} | "
+                        f"Company Description: {company_desc} | "
+                        f"Address Type: {address_type} | "
+                        f"(Score: {score:.2f})"
+                    )
+                else:
+                    context_lines.append(f"Address: {node} (Score: {score:.2f})")
+
+            context_data = "\n".join(context_lines)
+
+    except Exception as e:
+        logger.error(f"RAG Vector Search failed: {e}", exc_info=True)
+        context_data = f"Error performing search: {e}"
+
+    logger.info(f"RAG Agent Context built: {len(context_data)} chars")
+    logger.debug(f"Context preview: {context_data[:200]}")
+    return {"context": context_data}
+
+
+def rag_company_agent_node(state: AgentState):
+    """
+    Node to query company from the Neo4j Graph Database for Scrap Orders using Vector Search.
+    """
+    messages = state["messages"]
+    last_user_message = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
+    user_query = last_user_message.content if last_user_message else ""
+
+    neo4j = get_neo4j_manager()
+    embedding_service = get_embedding_service()
+
+    context_lines = []
+    try:
+        query_embedding = embedding_service.embed_query(user_query)
+
+        results = neo4j.vector_search("company_embedding_index", query_embedding, top_k=5)
+
+        if not results:
+            context_data = "No relevant companies found."
+        else:
+            for res in results:
+                node = res.get("node", {})
+                score = res.get("score", 0.0)
+
+                company_id = node.get("id")  # App-level ID
+                logging.info(f"Company ID: {company_id}")
+                if company_id:
+                    neighbor_query = """
+                     MATCH (c:Company {id: $company_id})
+                     OPTIONAL MATCH (o:Order)-[:POSTED_BY]->(c)
+                     OPTIONAL MATCH (o)-[:HAS_TYPE]->(t:ScrapType)
+                     OPTIONAL MATCH (o)-[:PICKUP_AT]->(a:Address)
+                     RETURN c.name as company, t.name as type, a.full_address as address,
+                            c.description as company_desc, a.type as address_type,
+                            c.phone as phone, c.tax_code as tax_code,
+                            c.email as email, c.verification_status as verification_status,
+                            a.description as address_desc,
+                            o.quantity as quantity, t.unit as unit, t.is_raw as is_raw,
+                            o.price as price, o.vehicle_req as vehicle_req,
+                            o.description as order_desc
+                     """
+                    neighbors = neo4j.execute_query(neighbor_query, {"company_id": company_id})
+                    neighbor_info = neighbors[0] if neighbors else {}
+
+                    company_name = neighbor_info.get("company", "Unknown")
+                    scrap_type = neighbor_info.get("type", "Unknown")
+                    address = neighbor_info.get("address", "Unknown")
+                    unit = neighbor_info.get("unit", "Unknown")
+                    phone = neighbor_info.get("phone", "Unknown")
+                    tax_code = neighbor_info.get("tax_code", "Unknown")
+                    address_description = neighbor_info.get("address_desc", "Unknown")
+                    is_raw = neighbor_info.get("is_raw", "Unknown")
+                    email = neighbor_info.get("email", "Unknown")
+                    verification_status = neighbor_info.get("verification_status", "Unknown")
+                    company_desc = neighbor_info.get("company_desc", "Unknown")
+                    address_type = neighbor_info.get("address_type", "Unknown")
+                    order_description = neighbor_info.get("order_desc", "Unknown")
+                    vehicle_req = neighbor_info.get("vehicle_req", "Unknown")
+                    order_qty = neighbor_info.get("quantity")
+                    order_price = neighbor_info.get("price")
+
+                    context_lines.append(
+                        f"Company: {company_name} | "
+                        f"Type: {scrap_type} | "
+                        f"Qty: {order_qty} | "
+                        f"Price: {order_price} | "
+                        f"Address: {address} | "
+                        f"Phone: {phone} | "
+                        f"Tax Code: {tax_code} | "
+                        f"Unit: {unit} | "
+                        f"Order Description: {order_description} | "
+                        f"Address Description: {address_description} | "
+                        f"Vehicle Required: {vehicle_req} | "
+                        f"Is Raw: {is_raw} | "
+                        f"Email: {email} | "
+                        f"Verification Status: {verification_status} | "
+                        f"Company Description: {company_desc} | "
+                        f"Address Type: {address_type} | "
+                        f"(Score: {score:.2f})"
+                    )
+                else:
+                    context_lines.append(f"Company: {node} (Score: {score:.2f})")
+
+            context_data = "\n".join(context_lines)
+
+    except Exception as e:
+        logger.error(f"RAG Vector Search failed: {e}", exc_info=True)
+        context_data = f"Error performing search: {e}"
+
+    logger.info(f"RAG Agent Context built: {len(context_data)} chars")
+    logger.debug(f"Context preview: {context_data[:200]}")
+    return {"context": context_data}
+
+
+def rag_order_agent_node(state: AgentState):
+    """
+    Node to query order from the Neo4j Graph Database for Scrap Orders using Vector Search.
     """
     messages = state["messages"]
     last_user_message = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
@@ -259,7 +559,10 @@ workflow = StateGraph(AgentState)
 
 workflow.add_node("agent", agent_node)
 workflow.add_node("google_search", tool_node)
-workflow.add_node("rag_agent", rag_agent_node)
+workflow.add_node("rag_scraptype_agent", rag_scraptype_agent_node)
+workflow.add_node("rag_address_agent", rag_address_agent_node)
+workflow.add_node("rag_company_agent", rag_company_agent_node)
+workflow.add_node("rag_order_agent", rag_order_agent_node)
 workflow.add_node("generate", generate_node)
 
 workflow.set_entry_point("agent")
@@ -267,14 +570,23 @@ workflow.set_entry_point("agent")
 workflow.add_conditional_edges(
     "agent",
     should_continue,
-    {"google_search": "google_search", "rag_agent": "rag_agent", "end": END},
+    {
+        "google_search": "google_search",
+        "rag_scraptype_agent": "rag_scraptype_agent",
+        "rag_address_agent": "rag_address_agent",
+        "rag_company_agent": "rag_company_agent",
+        "rag_order_agent": "rag_order_agent",
+        "end": END,
+    },
 )
-
 
 workflow.add_edge("google_search", "agent")
 
-
-workflow.add_edge("rag_agent", "generate")
+# Connect all RAG nodes to generate
+workflow.add_edge("rag_scraptype_agent", "generate")
+workflow.add_edge("rag_address_agent", "generate")
+workflow.add_edge("rag_company_agent", "generate")
+workflow.add_edge("rag_order_agent", "generate")
 workflow.add_edge("generate", END)
 
 
