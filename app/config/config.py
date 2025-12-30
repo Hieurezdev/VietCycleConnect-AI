@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(default_factory=lambda: os.getenv("GOOGLE_API_KEY", ""))
     # Models
     thinking_gemini_model: str = "gemini-3-pro-preview"
-    general_gemini_model: str = "gemini-2.5-pro"
+    general_gemini_model: str = "gemini-2.5-flash"
     embedding_model: str = "gemini-embedding-001"
 
     @property
@@ -25,7 +25,6 @@ class Settings(BaseSettings):
                 google_api_key=self.gemini_api_key,
                 temperature=0.2,
                 convert_system_message_to_human=True,
-                max_tokens=4096,
             )
         return self._llm
 
