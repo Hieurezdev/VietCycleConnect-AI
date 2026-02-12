@@ -51,6 +51,9 @@ class AgentOrchestrationService(IAgentOrchestrationService):
                 "context": "",
                 "next_step": "",
                 "output": "",
+                "use_knowledge_base": context.use_knowledge_base
+                if hasattr(context, "use_knowledge_base")
+                else False,
             }
 
             # Run Graph

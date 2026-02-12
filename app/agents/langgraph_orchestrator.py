@@ -10,6 +10,7 @@ from app.agents.state import AgentState
 from app.agents.tools.search_tool import google_search
 from app.config.config import get_settings
 from app.infra.graph_db import get_neo4j_manager
+from app.infra.mongodb import get_mongodb_manager
 from app.services.embedding_service import get_embedding_service
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ def should_continue(
     state: AgentState,
 ) -> Literal[
     "google_search",
+    "rag_knowledge_agent",
     "rag_scraptype_agent",
     "rag_address_agent",
     "rag_company_agent",
@@ -52,12 +54,18 @@ def should_continue(
     Priority:
     1. If LLM called a tool -> execute that tool
     2. If response contains a RAG marker -> route to appropriate RAG agent
-    3. If response is a final answer -> end
+    5. If response is a final answer -> end
     """
     messages = state["messages"]
     last_message = messages[-1]
 
     logger.info("=== should_continue called ===")
+
+    # Check if knowledge base mode is enabled (passed from API -> State)
+    if state.get("use_knowledge_base", False):
+        logger.info("Decision: Routing to rag_knowledge_agent (knowledge base mode)")
+        return "rag_knowledge_agent"
+
     logger.info(f"Last message type: {type(last_message)}")
 
     # Check if there are tool calls to execute
@@ -98,6 +106,50 @@ def should_continue(
     return "end"
 
 
+def rag_knowledge_agent_node(state: AgentState):
+    """
+    Node to query knowledge base from MongoDB Atlas using Vector Search.
+    For website usage guides and legal information.
+    """
+    messages = state["messages"]
+    last_user_message = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
+    user_query = last_user_message.content if last_user_message else ""
+
+    mongo = get_mongodb_manager()
+    embedding_service = get_embedding_service()
+
+    context_data = ""
+    try:
+        query_embedding = embedding_service.embed_query(user_query)
+
+        # Search specifically for usage guides and legal docs
+        results = mongo.vector_search(query_embedding, top_k=5)
+
+        if not results:
+            context_data = "KHÔNG TÌM THẤY THÔNG TIN TRONG CƠ SỞ DỮ LIỆU."
+        else:
+            context_lines = []
+            for res in results:
+                title = res.get("title", "Untitled")
+                content = res.get("content", "")
+                category = res.get("category", "General")
+                score = res.get("score", 0.0)
+
+                context_lines.append(
+                    f"--- Document (Score: {score:.2f}) ---\n"
+                    f"Title: {title}\nCategory: {category}\nContent:\n{content}\n"
+                )
+
+            context_data = "\n".join(context_lines)
+
+    except Exception as e:
+        logger.error(f"MongoDB Vector Search failed: {e}", exc_info=True)
+        context_data = f"Error performing search: {e}"
+
+    logger.info(f"Knowledge Base Context built: {len(context_data)} chars")
+    return {"context": context_data}
+
+
 def rag_scraptype_agent_node(state: AgentState):
     """
     Node to query scrap type from the Neo4j Graph Database for Scrap Orders using Vector Search.
@@ -123,65 +175,30 @@ def rag_scraptype_agent_node(state: AgentState):
                 score = res.get("score", 0.0)
 
                 scrap_type_id = node.get("id")  # App-level ID
+                scrap_type = node.get("name", "Unknown")
                 logging.info(f"Scrap Type ID: {scrap_type_id}")
                 if scrap_type_id:
+                    # Find orders associated with this scrap type and return only their IDs
                     neighbor_query = """
                      MATCH (t:ScrapType {id: $scrap_type_id})
                      OPTIONAL MATCH (o:Order)-[:HAS_TYPE]->(t)
-                     OPTIONAL MATCH (o)-[:POSTED_BY]->(c:Company)
-                     OPTIONAL MATCH (o)-[:PICKUP_AT]->(a:Address)
-                     RETURN c.name as company, t.name as type, a.full_address as address,
-                            c.description as company_desc, a.type as address_type,
-                            c.phone as phone, c.tax_code as tax_code,
-                            c.email as email, c.verification_status as verification_status,
-                            a.description as address_desc,
-                            o.quantity as quantity, t.unit as unit, t.is_raw as is_raw,
-                            o.price as price, o.vehicle_req as vehicle_req,
-                            o.description as order_desc
+                     RETURN o.id as order_id
+                     LIMIT 20
                      """
                     neighbors = neo4j.execute_query(
                         neighbor_query, {"scrap_type_id": scrap_type_id}
                     )
-                    neighbor_info = neighbors[0] if neighbors else {}
 
-                    company_name = neighbor_info.get("company", "Unknown")
-                    scrap_type = neighbor_info.get("type", "Unknown")
-                    address = neighbor_info.get("address", "Unknown")
-                    unit = neighbor_info.get("unit", "Unknown")
-                    phone = neighbor_info.get("phone", "Unknown")
-                    tax_code = neighbor_info.get("tax_code", "Unknown")
-                    address_description = neighbor_info.get("address_desc", "Unknown")
-                    is_raw = neighbor_info.get("is_raw", "Unknown")
-                    email = neighbor_info.get("email", "Unknown")
-                    verification_status = neighbor_info.get("verification_status", "Unknown")
-                    company_desc = neighbor_info.get("company_desc", "Unknown")
-                    address_type = neighbor_info.get("address_type", "Unknown")
-                    order_description = neighbor_info.get("order_desc", "Unknown")
-                    vehicle_req = neighbor_info.get("vehicle_req", "Unknown")
-                    order_qty = neighbor_info.get("quantity")
-                    order_price = neighbor_info.get("price")
-
-                    context_lines.append(
-                        f"Company: {company_name} | "
-                        f"Type: {scrap_type} | "
-                        f"Qty: {order_qty} | "
-                        f"Price: {order_price} | "
-                        f"Address: {address} | "
-                        f"Phone: {phone} | "
-                        f"Tax Code: {tax_code} | "
-                        f"Unit: {unit} | "
-                        f"Order Description: {order_description} | "
-                        f"Address Description: {address_description} | "
-                        f"Vehicle Required: {vehicle_req} | "
-                        f"Is Raw: {is_raw} | "
-                        f"Email: {email} | "
-                        f"Verification Status: {verification_status} | "
-                        f"Company Description: {company_desc} | "
-                        f"Address Type: {address_type} | "
-                        f"(Score: {score:.2f})"
-                    )
+                    if neighbors:
+                        for row in neighbors:
+                            order_id = row.get("order_id")
+                            if order_id:
+                                context_lines.append(
+                                    f"Order ID: {order_id} "
+                                    f"(Match: {scrap_type} - Score: {score:.2f})"
+                                )
                 else:
-                    context_lines.append(f"Order: {node} (Score: {score:.2f})")
+                    context_lines.append(f"Scrap Type Found: {node} (Score: {score:.2f})")
 
             context_data = "\n".join(context_lines)
 
@@ -221,61 +238,24 @@ def rag_address_agent_node(state: AgentState):
                 address_id = node.get("id")  # App-level ID
                 logging.info(f"Address ID: {address_id}")
                 if address_id:
+                    # Find orders associated with this address and return only their IDs
                     neighbor_query = """
                      MATCH (a:Address {id: $address_id})
                      OPTIONAL MATCH (o:Order)-[:PICKUP_AT]->(a)
-                     OPTIONAL MATCH (o)-[:POSTED_BY]->(c:Company)
-                     OPTIONAL MATCH (o)-[:HAS_TYPE]->(t:ScrapType)
-                     RETURN c.name as company, t.name as type, a.full_address as address,
-                            c.description as company_desc, a.type as address_type,
-                            c.phone as phone, c.tax_code as tax_code,
-                            c.email as email, c.verification_status as verification_status,
-                            a.description as address_desc,
-                            o.quantity as quantity, t.unit as unit, t.is_raw as is_raw,
-                            o.price as price, o.vehicle_req as vehicle_req,
-                            o.description as order_desc
+                     RETURN o.id as order_id
+                     LIMIT 20
                      """
                     neighbors = neo4j.execute_query(neighbor_query, {"address_id": address_id})
-                    neighbor_info = neighbors[0] if neighbors else {}
 
-                    company_name = neighbor_info.get("company", "Unknown")
-                    scrap_type = neighbor_info.get("type", "Unknown")
-                    address = neighbor_info.get("address", "Unknown")
-                    unit = neighbor_info.get("unit", "Unknown")
-                    phone = neighbor_info.get("phone", "Unknown")
-                    tax_code = neighbor_info.get("tax_code", "Unknown")
-                    address_description = neighbor_info.get("address_desc", "Unknown")
-                    is_raw = neighbor_info.get("is_raw", "Unknown")
-                    email = neighbor_info.get("email", "Unknown")
-                    verification_status = neighbor_info.get("verification_status", "Unknown")
-                    company_desc = neighbor_info.get("company_desc", "Unknown")
-                    address_type = neighbor_info.get("address_type", "Unknown")
-                    order_description = neighbor_info.get("order_desc", "Unknown")
-                    vehicle_req = neighbor_info.get("vehicle_req", "Unknown")
-                    order_qty = neighbor_info.get("quantity")
-                    order_price = neighbor_info.get("price")
-
-                    context_lines.append(
-                        f"Company: {company_name} | "
-                        f"Type: {scrap_type} | "
-                        f"Qty: {order_qty} | "
-                        f"Price: {order_price} | "
-                        f"Address: {address} | "
-                        f"Phone: {phone} | "
-                        f"Tax Code: {tax_code} | "
-                        f"Unit: {unit} | "
-                        f"Order Description: {order_description} | "
-                        f"Address Description: {address_description} | "
-                        f"Vehicle Required: {vehicle_req} | "
-                        f"Is Raw: {is_raw} | "
-                        f"Email: {email} | "
-                        f"Verification Status: {verification_status} | "
-                        f"Company Description: {company_desc} | "
-                        f"Address Type: {address_type} | "
-                        f"(Score: {score:.2f})"
-                    )
+                    if neighbors:
+                        for row in neighbors:
+                            order_id = row.get("order_id")
+                            if order_id:
+                                context_lines.append(
+                                    f"Order ID: {order_id} (Address Match - Score: {score:.2f})"
+                                )
                 else:
-                    context_lines.append(f"Address: {node} (Score: {score:.2f})")
+                    context_lines.append(f"Address Match: {node} (Score: {score:.2f})")
 
             context_data = "\n".join(context_lines)
 
@@ -315,61 +295,24 @@ def rag_company_agent_node(state: AgentState):
                 company_id = node.get("id")  # App-level ID
                 logging.info(f"Company ID: {company_id}")
                 if company_id:
+                    # Find orders associated with this company and return only their IDs
                     neighbor_query = """
                      MATCH (c:Company {id: $company_id})
                      OPTIONAL MATCH (o:Order)-[:POSTED_BY]->(c)
-                     OPTIONAL MATCH (o)-[:HAS_TYPE]->(t:ScrapType)
-                     OPTIONAL MATCH (o)-[:PICKUP_AT]->(a:Address)
-                     RETURN c.name as company, t.name as type, a.full_address as address,
-                            c.description as company_desc, a.type as address_type,
-                            c.phone as phone, c.tax_code as tax_code,
-                            c.email as email, c.verification_status as verification_status,
-                            a.description as address_desc,
-                            o.quantity as quantity, t.unit as unit, t.is_raw as is_raw,
-                            o.price as price, o.vehicle_req as vehicle_req,
-                            o.description as order_desc
+                     RETURN o.id as order_id
+                     LIMIT 20
                      """
                     neighbors = neo4j.execute_query(neighbor_query, {"company_id": company_id})
-                    neighbor_info = neighbors[0] if neighbors else {}
 
-                    company_name = neighbor_info.get("company", "Unknown")
-                    scrap_type = neighbor_info.get("type", "Unknown")
-                    address = neighbor_info.get("address", "Unknown")
-                    unit = neighbor_info.get("unit", "Unknown")
-                    phone = neighbor_info.get("phone", "Unknown")
-                    tax_code = neighbor_info.get("tax_code", "Unknown")
-                    address_description = neighbor_info.get("address_desc", "Unknown")
-                    is_raw = neighbor_info.get("is_raw", "Unknown")
-                    email = neighbor_info.get("email", "Unknown")
-                    verification_status = neighbor_info.get("verification_status", "Unknown")
-                    company_desc = neighbor_info.get("company_desc", "Unknown")
-                    address_type = neighbor_info.get("address_type", "Unknown")
-                    order_description = neighbor_info.get("order_desc", "Unknown")
-                    vehicle_req = neighbor_info.get("vehicle_req", "Unknown")
-                    order_qty = neighbor_info.get("quantity")
-                    order_price = neighbor_info.get("price")
-
-                    context_lines.append(
-                        f"Company: {company_name} | "
-                        f"Type: {scrap_type} | "
-                        f"Qty: {order_qty} | "
-                        f"Price: {order_price} | "
-                        f"Address: {address} | "
-                        f"Phone: {phone} | "
-                        f"Tax Code: {tax_code} | "
-                        f"Unit: {unit} | "
-                        f"Order Description: {order_description} | "
-                        f"Address Description: {address_description} | "
-                        f"Vehicle Required: {vehicle_req} | "
-                        f"Is Raw: {is_raw} | "
-                        f"Email: {email} | "
-                        f"Verification Status: {verification_status} | "
-                        f"Company Description: {company_desc} | "
-                        f"Address Type: {address_type} | "
-                        f"(Score: {score:.2f})"
-                    )
+                    if neighbors:
+                        for row in neighbors:
+                            order_id = row.get("order_id")
+                            if order_id:
+                                context_lines.append(
+                                    f"Order ID: {order_id} (Company Match - Score: {score:.2f})"
+                                )
                 else:
-                    context_lines.append(f"Company: {node} (Score: {score:.2f})")
+                    context_lines.append(f"Company Match: {node} (Score: {score:.2f})")
 
             context_data = "\n".join(context_lines)
 
@@ -409,61 +352,11 @@ def rag_order_agent_node(state: AgentState):
                 order_id = node.get("id")  # App-level ID
                 logging.info(f"Order ID: {order_id}")
                 if order_id:
-                    neighbor_query = """
-                     MATCH (o:Order {id: $order_id})
-                     OPTIONAL MATCH (o)-[:POSTED_BY]->(c:Company)
-                     OPTIONAL MATCH (o)-[:HAS_TYPE]->(t:ScrapType)
-                     OPTIONAL MATCH (o)-[:PICKUP_AT]->(a:Address)
-                     RETURN c.name as company, t.name as type, a.full_address as address,
-                            c.description as company_desc, a.type as address_type,
-                            c.phone as phone, c.tax_code as tax_code,
-                            c.email as email, c.verification_status as verification_status,
-                            a.description as address_desc,
-                            o.quantity as quantity, t.unit as unit, t.is_raw as is_raw,
-                            o.price as price, o.vehicle_req as vehicle_req,
-                            o.description as order_desc
-                     """
-                    neighbors = neo4j.execute_query(neighbor_query, {"order_id": order_id})
-                    neighbor_info = neighbors[0] if neighbors else {}
-
-                    company_name = neighbor_info.get("company", "Unknown")
-                    scrap_type = neighbor_info.get("type", "Unknown")
-                    address = neighbor_info.get("address", "Unknown")
-                    unit = neighbor_info.get("unit", "Unknown")
-                    phone = neighbor_info.get("phone", "Unknown")
-                    tax_code = neighbor_info.get("tax_code", "Unknown")
-                    address_description = neighbor_info.get("address_desc", "Unknown")
-                    is_raw = neighbor_info.get("is_raw", "Unknown")
-                    email = neighbor_info.get("email", "Unknown")
-                    verification_status = neighbor_info.get("verification_status", "Unknown")
-                    company_desc = neighbor_info.get("company_desc", "Unknown")
-                    address_type = neighbor_info.get("address_type", "Unknown")
-                    order_description = neighbor_info.get("order_desc", "Unknown")
-                    vehicle_req = neighbor_info.get("vehicle_req", "Unknown")
-                    order_qty = neighbor_info.get("quantity")
-                    order_price = neighbor_info.get("price")
-
                     context_lines.append(
-                        f"Company: {company_name} | "
-                        f"Type: {scrap_type} | "
-                        f"Qty: {order_qty} | "
-                        f"Price: {order_price} | "
-                        f"Address: {address} | "
-                        f"Phone: {phone} | "
-                        f"Tax Code: {tax_code} | "
-                        f"Unit: {unit} | "
-                        f"Order Description: {order_description} | "
-                        f"Address Description: {address_description} | "
-                        f"Vehicle Required: {vehicle_req} | "
-                        f"Is Raw: {is_raw} | "
-                        f"Email: {email} | "
-                        f"Verification Status: {verification_status} | "
-                        f"Company Description: {company_desc} | "
-                        f"Address Type: {address_type} | "
-                        f"(Score: {score:.2f})"
+                        f"Order ID: {order_id} (Direct Match - Score: {score:.2f})"
                     )
                 else:
-                    context_lines.append(f"Order: {node} (Score: {score:.2f})")
+                    context_lines.append(f"Order Match: {node} (Score: {score:.2f})")
 
             context_data = "\n".join(context_lines)
 
@@ -491,61 +384,54 @@ def generate_node(state: AgentState):
 
     logger.info(f"User query: {user_query[:100]}")
 
-    # Create system prompt with context
-    system_prompt = f"""You are Tina, a cute assistant of scrap matching system.
+    logger.info(f"User query: {user_query[:100]}")
 
-Based on the following search results from our database, provide a helpful response in Vietnamese:
+    # Check mode to determine system prompt
+    is_knowledge_base_mode = state.get("use_knowledge_base", False)
 
+    if is_knowledge_base_mode:
+        # Knowledge Base Prompt
+        system_prompt = f"""Bạn là trợ lý AI của VietCycleConnect,
+chuyên hỗ trợ giải đáp về cách sử dụng website
+và các vấn đề pháp lý.
+
+Dựa trên các thông tin được tìm thấy trong CƠ SỞ TRI THỨC dưới đây,
+hãy trả lời câu hỏi của người dùng
+một cách chính xác, thân thiện và hữu ích.
+
+CƠ SỞ TRI THỨC:
 {context}
 
-**IMPORTANT**: Format your response as a markdown list with the following structure:
+HƯỚNG DẪN TRẢ LỜI:
+1. Chỉ sử dụng thông tin có trong CƠ SỞ TRI THỨC để trả lời. Nếu không tìm thấy thông tin phù hợp,
+hãy xin lỗi và gợi ý liên hệ hotline hỗ trợ.
+2. Trình bày câu trả lời rõ ràng, dễ hiểu, sử dụng các bước (1, 2, 3...) hoặc gạch đầu dòng
+nếu là hướng dẫn quy trình.
+3. Giữ giọng văn chuyên nghiệp nhưng gần gũi (dùng "mình", "bạn" hoặc "chúng tôi").
+4. Cuối câu trả lời có thể gợi ý thêm các mục liên quan nếu có.
+"""
+    else:
+        # Existing Scrap Matching Prompt (Modified for ID Only)
+        system_prompt = f"""You are Tina, a cute assistant of scrap matching system.
 
-1. Start with a brief greeting and summary of how many results were found
-2. For each order, create a numbered list item with:
-   - **Công ty**: Company name
-   - **Loại phế liệu**: Scrap type
-   - **Số lượng**: Quantity with unit
-   - **Giá**: Price (or "Liên hệ" if not specified)
-   - **Địa chỉ**: Full address
-   - **Số điện thoại**: Phone number (or "Chưa cập nhật" if not available)
-   - **Email**: Email (or "Chưa cập nhật" if not available)
-   - **Trạng thái xác minh**: Verification status if available
-   - **Yêu cầu phương tiện**: Vehicle requirements if specified
-   - **Đơn vị**: Unit if available
-   - **Loại đơn hàng**: Order type if available
-   - **Raw**: Raw if available
-   - **Mô tả đơn hàng**: Brief description from order
-   - **Mô tả địa chỉ**: Brief description from address
-   - **Mô tả công ty**: Brief description from company
+Based on the following search results from our database, specifically the found Order IDs,
+provide a response in Vietnamese that lists the relevant Order IDs.
 
-3. End with a helpful call-to-action
+Search Results:
+{context}
 
-Example format:
-```
-Xin chào! Tôi tìm thấy [số lượng] đơn hàng phù hợp với yêu cầu của bạn:
+**IMPORTANT**:
+Your task is to extracting the 'Order ID' values from the search results
+and present them in a clear list.
+Do NOT invent details. If the context contains IDs, just list them.
 
-### 1. [Tên công ty]
-- **Loại phế liệu**: [loại]
-- **Số lượng**: [số lượng] [đơn vị]
-- **Giá**: [giá] VNĐ
-- **Địa chỉ**: [địa chỉ đầy đủ]
-- **Số điện thoại**: [số điện thoại]
-- **Email**: [email]
-- **Mô tả**: [mô tả ngắn gọn]
-- **Trạng thái xác minh**: [trạng thái xác minh]
-- **Yêu cầu phương tiện**: [yêu cầu phương tiện]
-- **Đơn vị**: [đơn vị]
-- **Loại đơn hàng**: [loại đơn hàng]
-- **Raw**: [raw]
-- **Mô tả đơn hàng**: [mô tả đơn hàng]
-- **Mô tả địa chỉ**: [mô tả địa chỉ]
-- **Mô tả công ty**: [mô tả công ty]
-
-### 2. [Tên công ty tiếp theo]
+Format your response as:
+"Tìm thấy các đơn hàng phù hợp sau đây:"
+- [Order ID 1]
+- [Order ID 2]
 ...
-```
 
-If no results found, politely suggest they try different search terms or contact support.
+If no IDs are found in the context, say "Không tìm thấy đơn hàng nào phù hợp."
 """
 
     response = llm.invoke([SystemMessage(content=system_prompt), HumanMessage(content=user_query)])
@@ -559,6 +445,7 @@ workflow = StateGraph(AgentState)
 
 workflow.add_node("agent", agent_node)
 workflow.add_node("google_search", tool_node)
+workflow.add_node("rag_knowledge_agent", rag_knowledge_agent_node)
 workflow.add_node("rag_scraptype_agent", rag_scraptype_agent_node)
 workflow.add_node("rag_address_agent", rag_address_agent_node)
 workflow.add_node("rag_company_agent", rag_company_agent_node)
@@ -572,6 +459,7 @@ workflow.add_conditional_edges(
     should_continue,
     {
         "google_search": "google_search",
+        "rag_knowledge_agent": "rag_knowledge_agent",
         "rag_scraptype_agent": "rag_scraptype_agent",
         "rag_address_agent": "rag_address_agent",
         "rag_company_agent": "rag_company_agent",
@@ -583,6 +471,7 @@ workflow.add_conditional_edges(
 workflow.add_edge("google_search", "agent")
 
 # Connect all RAG nodes to generate
+workflow.add_edge("rag_knowledge_agent", "generate")
 workflow.add_edge("rag_scraptype_agent", "generate")
 workflow.add_edge("rag_address_agent", "generate")
 workflow.add_edge("rag_company_agent", "generate")

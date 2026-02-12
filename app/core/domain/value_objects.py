@@ -42,6 +42,7 @@ class ChatContext(BaseModel):
 
     recent_messages: list[ChatMessage] = Field(default_factory=list)
     detected_topics: list[str] = Field(default_factory=list)
+    use_knowledge_base: bool = False  # Default to False for backward compatibility
 
     class Config:
         """Pydantic config."""

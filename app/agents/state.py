@@ -12,3 +12,4 @@ class AgentState(TypedDict):
     context: str
     next_step: str  # "search", "rag", "respond"
     output: str
+    use_knowledge_base: bool  # Mode flag: True for knowledge base, False for scrap matching

@@ -1,0 +1,125 @@
+[
+    {
+        "id": "kb_usage_001",
+        "title": "Cách đăng ký tài khoản",
+        "content": "Để đăng ký tài khoản trên VietCycleConnect:\n1. Truy cập trang chủ và nhấn nút 'Đăng ký' ở góc trên bên phải.\n2. Chọn loại tài khoản: 'Người bán' (nếu bạn có phế liệu) hoặc 'Người thu gom' (nếu bạn là công ty/vựa phế liệu).\n3. Điền đầy đủ thông tin: Họ tên, Số điện thoại, Email, và Mật khẩu.\n4. Nhập mã OTP được gửi về số điện thoại để xác thực.\n5. Hoàn tất đăng ký và cập nhật hồ sơ cá nhân.",
+        "category": "website_usage",
+        "tags": [
+            "đăng ký",
+            "tài khoản",
+            "người bán",
+            "người thu gom",
+            "register"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_usage_002",
+        "title": "Cách tạo đơn hàng bán phế liệu",
+        "content": "Quy trình tạo đơn hàng bán phế liệu:\n1. Đăng nhập vào tài khoản 'Người bán'.\n2. Chọn 'Đăng đơn hàng mới' trên bảng điều khiển.\n3. Chọn loại phế liệu (Giấy, Nhựa, Kim loại, v.v.) từ danh sách.\n4. Đăng tải hình ảnh thực tế của phế liệu.\n5. Nhập ước lượng khối lượng và mô tả chi tiết (tình trạng, vị trí).\n6. Nhập địa chỉ lấy hàng và thời gian mong muốn.\n7. Nhấn 'Đăng tin' để công khai đơn hàng cho các người thu gom.",
+        "category": "website_usage",
+        "tags": [
+            "tạo đơn",
+            "bán phế liệu",
+            "đăng tin",
+            "hình ảnh",
+            "khối lượng"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_usage_003",
+        "title": "Cách tìm kiếm đơn hàng thu mua",
+        "content": "Dành cho Người thu gom/Công ty tái chế:\n1. Đăng nhập tài khoản doanh nghiệp.\n2. Truy cập mục 'Sàn giao dịch' hoặc 'Tìm kiếm đơn hàng'.\n3. Sử dụng bộ lọc để tìm theo: Loại phế liệu, Khu vực (Hà Nội, TP.HCM...), Khối lượng.\n4. Xem chi tiết đơn hàng và hình ảnh.\n5. Nhấn 'Nhận đơn' hoặc 'Liên hệ' để trao đổi với người bán.",
+        "category": "website_usage",
+        "tags": [
+            "tìm kiếm",
+            "thu mua",
+            "sàn giao dịch",
+            "bộ lọc",
+            "người thu gom"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_usage_004",
+        "title": "Cách liên hệ hỗ trợ kỹ thuật",
+        "content": "Nếu bạn gặp sự cố khi sử dụng VietCycleConnect:\n- Hotline hỗ trợ: 1900 xxxx (8:00 - 17:00 hàng ngày).\n- Email: support@vietcycleconnect.com\n- Chat trực tiếp: Nhấn vào biểu tượng Chat ở góc dưới màn hình.\n- Trung tâm trợ giúp: Truy cập trang 'Hỏi đáp' để xem các vấn đề thường gặp.",
+        "category": "website_usage",
+        "tags": [
+            "hỗ trợ",
+            "liên hệ",
+            "hotline",
+            "email",
+            "lỗi kỹ thuật"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_usage_005",
+        "title": "Quên mật khẩu",
+        "content": "Để lấy lại mật khẩu:\n1. Tại màn hình Đăng nhập, chọn 'Quên mật khẩu'.\n2. Nhập số điện thoại hoặc email đã đăng ký.\n3. Nhập mã xác thực (OTP) được gửi đến.\n4. Tạo mật khẩu mới và xác nhận.\n5. Đăng nhập lại bằng mật khẩu mới.",
+        "category": "website_usage",
+        "tags": [
+            "quên mật khẩu",
+            "khôi phục",
+            "mật khẩu mới",
+            "reset password"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_legal_001",
+        "title": "Chính sách bảo mật thông tin",
+        "content": "VietCycleConnect cam kết bảo mật thông tin người dùng:\n1. Dữ liệu cá nhân (SĐT, địa chỉ) chỉ được chia sẻ giữa Người mua và Người bán khi đơn hàng được chấp nhận.\n2. Chúng tôi sử dụng mã hóa SSL để bảo vệ dữ liệu truyền tải.\n3. Không chia sẻ thông tin cho bên thứ ba vì mục đích thương mại khi chưa có sự đồng ý.\n4. Người dùng có quyền yêu cầu xem, chỉnh sửa hoặc xóa dữ liệu cá nhân của mình.",
+        "category": "legal",
+        "tags": [
+            "bảo mật",
+            "riêng tư",
+            "dữ liệu cá nhân",
+            "chia sẻ thông tin"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_legal_002",
+        "title": "Điều khoản sử dụng dịch vụ",
+        "content": "Khi sử dụng VietCycleConnect, bạn đồng ý:\n- Cung cấp thông tin trung thực, chính xác về phế liệu và năng lực thu mua.\n- Không đăng tải nội dung cấm, lừa đảo hoặc vi phạm pháp luật.\n- Giữ thái độ văn minh, lịch sự khi giao tiếp trên nền tảng.\n- Chịu trách nhiệm về các giao dịch thực tế diễn ra (chất lượng, thanh toán).\n- VietCycleConnect là nền tảng kết nối, không chịu trách nhiệm trực tiếp về hàng hóa.",
+        "category": "legal",
+        "tags": [
+            "điều khoản",
+            "quy định",
+            "trách nhiệm",
+            "cam kết",
+            "nguyên tắc"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_legal_003",
+        "title": "Quy trình giải quyết tranh chấp",
+        "content": "Trong trường hợp xảy ra tranh chấp giao dịch:\n1. Hai bên thương lượng dựa trên tinh thần thiện chí.\n2. Nếu không thành, gửi khiếu nại về Bộ phận CSKH của VietCycleConnect kèm bằng chứng (ảnh, tin nhắn).\n3. VietCycleConnect sẽ đóng vai trò trung gian hòa giải trong vòng 3-5 ngày làm việc.\n4. Nếu vẫn không giải quyết được, vụ việc có thể được đưa ra cơ quan pháp luật có thẩm quyền.",
+        "category": "legal",
+        "tags": [
+            "tranh chấp",
+            "khiếu nại",
+            "giải quyết",
+            "hòa giải",
+            "bảo vệ quyền lợi"
+        ],
+        "language": "vi"
+    },
+    {
+        "id": "kb_faq_001",
+        "title": "VietCycleConnect có thu phí không?",
+        "content": "Hiện tại VietCycleConnect:\n- Miễn phí đăng ký và đăng tin cho Người bán cá nhân.\n- Áp dụng phí thành viên hoặc phí hoa hồng nhỏ đối với Doanh nghiệp thu mua để duy trì nền tảng.\n- Chi tiết biểu phí có thể xem tại mục 'Bảng giá dịch vụ' trên trang chủ.",
+        "category": "faq",
+        "tags": [
+            "phí dịch vụ",
+            "miễn phí",
+            "hoa hồng",
+            "chi phí"
+        ],
+        "language": "vi"
+    }
+]

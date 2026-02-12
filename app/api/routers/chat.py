@@ -23,6 +23,10 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(
         default_factory=list, max_length=50, description="Recent conversation history"
     )
+    use_knowledge_base: bool = Field(
+        default=False,
+        description="If True, query knowledge base mode. If False, use scrap matching mode.",
+    )
 
 
 class ChatResponseModel(BaseModel):
@@ -62,13 +66,15 @@ async def send_message(
         logger.info(
             f"Chat request: "
             f"message length={len(request.message)}, "
-            f"history length={len(request.messages)}"
+            f"history length={len(request.messages)}, "
+            f"use_knowledge_base={request.use_knowledge_base}"
         )
 
         # Build conversation context
         context = ChatContext(
             recent_messages=request.messages,
             detected_topics=[],
+            use_knowledge_base=request.use_knowledge_base,
         )
 
         # Route message through agents

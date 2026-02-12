@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     neo4j_username: str = Field(default="neo4j")
     neo4j_password: str = Field(default="password")
 
+    # --- MongoDB Atlas Settings ---
+    mongodb_uri: str = Field(default="mongodb+srv://localhost")
+    mongodb_database: str = Field(default="vietcycle_knowledge")
+    mongodb_collection: str = Field(default="knowledge_base")
+
     # --- Agent Settings ---
     google_search_api_key: str | None = os.getenv("GOOGLE_API_KEY")
     google_cse_id: str | None = os.getenv("GOOGLE_CSE_ID")
