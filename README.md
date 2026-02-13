@@ -166,6 +166,8 @@
 }
 ```
 
+> **Full Documentation**: See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for detailed usage, schema definitions, and modes.
+
 **Response:**
 ```json
 {

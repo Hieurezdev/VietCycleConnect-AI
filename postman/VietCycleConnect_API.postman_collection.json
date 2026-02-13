@@ -1,0 +1,110 @@
+{
+    "info": {
+        "_postman_id": "b3e3e3e3-3e3e-3e3e-3e3e-3e3e3e3e3e3e",
+        "name": "VietCycleConnect AI API",
+        "description": "API Requests for VietCycleConnect AI Agent features including Knowledge Base RAG and Scrap Matching.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Knowledge Base (Website Usage)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"message\": \"Làm sao để đăng ký tài khoản?\",\n    \"use_knowledge_base\": true\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/chat/",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "chat",
+                        ""
+                    ]
+                },
+                "description": "Query the Knowledge Base for website usage instructions."
+            },
+            "response": []
+        },
+        {
+            "name": "Knowledge Base (Legal Info)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"message\": \"Chính sách bảo mật của bạn là gì?\",\n    \"use_knowledge_base\": true\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/chat/",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "chat",
+                        ""
+                    ]
+                },
+                "description": "Query the Knowledge Base for legal information."
+            },
+            "response": []
+        },
+        {
+            "name": "Scrap Matching (Find Orders)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"message\": \"Tìm đơn hàng sắt vụn\",\n    \"use_knowledge_base\": false\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/v1/chat/",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "chat",
+                        ""
+                    ]
+                },
+                "description": "Query for scrap orders using the ID-only output format."
+            },
+            "response": []
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000",
+            "type": "string"
+        }
+    ]
+}
