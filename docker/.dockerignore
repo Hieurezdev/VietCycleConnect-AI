@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing & linting
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+logging
+
+# Docs & scripts (not needed at runtime)
+docs/
+scripts/
+postman/
+tests/
+data/
+init/
+docker/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Misc
+README.md
+Makefile
+*.md

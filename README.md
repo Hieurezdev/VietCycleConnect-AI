@@ -153,6 +153,62 @@
 
 ---
 
+## Docker
+
+### Prerequisites
+
+- **Docker** và **Docker Compose** đã được cài đặt
+
+### Chạy với Docker Compose
+
+1. **Đảm bảo file `.env` đã được tạo** ở thư mục gốc (xem bước Configure Environment ở trên)
+
+2. **Build và start container:**
+   ```bash
+   cd docker
+   docker compose up --build
+   ```
+
+3. **Chạy nền (detached mode):**
+   ```bash
+   docker compose up --build -d
+   ```
+
+4. **Xem logs:**
+   ```bash
+   docker compose logs -f
+   ```
+
+5. **Dừng container:**
+   ```bash
+   docker compose down
+   ```
+
+### Build image thủ công
+
+```bash
+# Build từ thư mục gốc
+docker build -f docker/Dockerfile -t vietcycle-ai .
+
+# Run container
+docker run -p 2003:2003 --env-file .env vietcycle-ai
+```
+
+### Cấu trúc Docker
+
+```
+docker/
+├── Dockerfile          # Multi-stage build (builder + runtime)
+├── docker-compose.yml  # Compose config
+└── .dockerignore       # Loại trừ file không cần thiết
+```
+
+> **Lưu ý:** Neo4j Aura và MongoDB Atlas là cloud services — không cần chạy thêm container nào. Chỉ cần đảm bảo các biến môi trường trong `.env` được cấu hình đúng.
+
+App sẽ chạy tại: `http://localhost:2003`
+
+---
+
 ## API Usage
 
 ### Chat Endpoint
@@ -207,6 +263,10 @@ VietCycleConnectAI/
 │   ├── services/            # Business services
 │   │   └── embedding_service.py
 │   └── config/              # Configuration
+├── docker/                  # Docker files
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── .dockerignore
 ├── tests/                   # Unit & Integration tests
 ├── .env                     # Environment variables
 ├── Makefile                 # Development commands
